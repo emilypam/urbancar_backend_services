@@ -79,16 +79,6 @@ jobs:
           push: true
           tags: urbancarregistry.azurecr.io/bus-service:latest
 
-      - name: Build y push — nginx-frontend
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          file: ./Dockerfile.nginx.containerapp
-          push: true
-          tags: |
-            urbancarregistry.azurecr.io/nginx-frontend:latest
-            urbancarregistry.azurecr.io/nginx-frontend:${{ github.sha }}
-
       - name: Registrar providers de Azure
         run: |
           az provider register --namespace Microsoft.App --wait
@@ -173,24 +163,3 @@ jobs:
             "INVENTARIO_SERVICE_URL=http://inventario-service" \
             "FINANCIERO_SERVICE_URL=http://financiero-service"
 
-      - name: Deploy nginx-frontend (externo)
-        run: |
-          APP_URL=$(az containerapp create \
-            --name nginx-frontend \
-            --resource-group $RESOURCE_GROUP \
-            --environment $ENVIRONMENT_NAME \
-            --image $ACR_SERVER/nginx-frontend:$GITHUB_SHA \
-            --registry-server $ACR_SERVER \
-            --registry-username ${{ secrets.ACR_USERNAME }} \
-            --registry-password ${{ secrets.ACR_PASSWORD }} \
-            --ingress external --target-port 80 \
-            --min-replicas 1 --max-replicas 3 \
-            --query properties.configuration.ingress.fqdn \
-            --output tsv 2>/dev/null || \
-          az containerapp update \
-            --name nginx-frontend \
-            --resource-group $RESOURCE_GROUP \
-            --image $ACR_SERVER/nginx-frontend:$GITHUB_SHA \
-            --query properties.configuration.ingress.fqdn \
-            --output tsv)
-          echo "✅ URL: https://$APP_URL"
