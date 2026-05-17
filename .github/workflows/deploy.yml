@@ -85,7 +85,9 @@ jobs:
           context: .
           file: ./Dockerfile.nginx.containerapp
           push: true
-          tags: urbancarregistry.azurecr.io/nginx-frontend:latest
+          tags: |
+            urbancarregistry.azurecr.io/nginx-frontend:latest
+            urbancarregistry.azurecr.io/nginx-frontend:${{ github.sha }}
 
       - name: Registrar providers de Azure
         run: |
@@ -113,13 +115,14 @@ jobs:
               --registry-username ${{ secrets.ACR_USERNAME }} \
               --registry-password ${{ secrets.ACR_PASSWORD }} \
               --ingress internal --target-port $PORT \
-              --min-replicas 0 --max-replicas 2 \
+              --min-replicas 1 --max-replicas 2 \
               --env-vars $ENVVARS \
               --output none 2>/dev/null || \
             az containerapp update \
               --name $NAME \
               --resource-group $RESOURCE_GROUP \
               --image $ACR_SERVER/$IMAGE \
+              --min-replicas 1 \
               --output none
             echo "  $NAME ✓"
           }
@@ -176,7 +179,7 @@ jobs:
             --name nginx-frontend \
             --resource-group $RESOURCE_GROUP \
             --environment $ENVIRONMENT_NAME \
-            --image $ACR_SERVER/nginx-frontend:latest \
+            --image $ACR_SERVER/nginx-frontend:$GITHUB_SHA \
             --registry-server $ACR_SERVER \
             --registry-username ${{ secrets.ACR_USERNAME }} \
             --registry-password ${{ secrets.ACR_PASSWORD }} \
@@ -187,7 +190,7 @@ jobs:
           az containerapp update \
             --name nginx-frontend \
             --resource-group $RESOURCE_GROUP \
-            --image $ACR_SERVER/nginx-frontend:latest \
+            --image $ACR_SERVER/nginx-frontend:$GITHUB_SHA \
             --query properties.configuration.ingress.fqdn \
             --output tsv)
           echo "✅ URL: https://$APP_URL"
