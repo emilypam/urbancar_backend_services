@@ -9,5 +9,5 @@ RUN npm run build -- --configuration production
 # Stage 2: Nginx con frontend + config para Container Apps
 FROM nginx:alpine
 COPY --from=frontend-builder /frontend/dist/urbancar-ec-frontend/browser /usr/share/nginx/html
-COPY nginx/nginx.containerapp.conf /etc/nginx/conf.d/default.conf
+COPY UrbanCar_Front/nginx/nginx.containerapp.conf /etc/nginx/conf.d/default.conf
 EXPOSE 80
