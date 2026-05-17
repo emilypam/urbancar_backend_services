@@ -1,0 +1,62 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model Usuario {
+  id           String             @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  email        String             @unique
+  passwordHash String             @map("password_hash")
+  nombres      String?
+  apellidos    String?
+  cedula       String?            @unique
+  telefono     String?
+  ciudadId     String?            @map("ciudad_id") @db.Uuid
+  role         user_role?         @default(CLIENTE)
+  isActive     Boolean?           @default(true) @map("is_active")
+  createdAt    DateTime?          @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt    DateTime?          @default(now()) @updatedAt @map("updated_at") @db.Timestamp(6)
+  cliente      Cliente?
+  historial    HistorialUsuario[]
+
+  @@index([email], map: "idx_usuarios_email")
+  @@map("usuarios")
+}
+
+model Cliente {
+  id                String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  usuarioId         String?   @unique @map("usuario_id") @db.Uuid
+  numeroLicencia    String?   @unique @map("numero_licencia")
+  fechaVencLicencia DateTime? @map("fecha_venc_licencia") @db.Timestamp(6)
+  createdAt         DateTime? @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt         DateTime? @default(now()) @updatedAt @map("updated_at") @db.Timestamp(6)
+  usuario           Usuario?  @relation(fields: [usuarioId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@map("clientes")
+}
+
+model HistorialUsuario {
+  id        String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  usuarioId String?   @map("usuario_id") @db.Uuid
+  accion    String?
+  entidad   String?
+  entidadId String?   @map("entidad_id")
+  detalle   Json?
+  ip        String?
+  userAgent String?   @map("user_agent")
+  createdAt DateTime? @default(now()) @map("created_at") @db.Timestamp(6)
+  usuario   Usuario?  @relation(fields: [usuarioId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([usuarioId], map: "idx_historial_usuario")
+  @@map("historial_usuarios")
+}
+
+enum user_role {
+  ADMIN
+  CLIENTE
+}

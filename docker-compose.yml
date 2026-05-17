@@ -1,0 +1,132 @@
+version: '3.9'
+
+services:
+
+  # ── API Gateway ─────────────────────────────────────────────────────────────
+  nginx:
+    build:
+      context: .
+      dockerfile: Dockerfile.nginx
+    ports:
+      - '80:80'
+    depends_on:
+      - auth-service
+      - inventario-service
+      - org-service
+      - operaciones-service
+      - financiero-service
+      - mantenimiento-service
+      - bus-service
+    networks:
+      - urbancar-net
+
+  # ── auth-service (puerto 3001) ───────────────────────────────────────────────
+  auth-service:
+    build: ./services/auth-service
+    environment:
+      - DATABASE_URL=${AUTH_DATABASE_URL}
+      - DIRECT_URL=${AUTH_DIRECT_URL}
+      - JWT_SECRET=${JWT_SECRET}
+      - JWT_EXPIRES_IN=${JWT_EXPIRES_IN:-7d}
+      - PORT=3001
+      - NODE_ENV=${NODE_ENV:-production}
+      - CORS_ORIGIN=${CORS_ORIGIN:-*}
+    networks:
+      - urbancar-net
+    restart: unless-stopped
+
+  # ── inventario-service (puerto 3002) ────────────────────────────────────────
+  inventario-service:
+    build: ./services/inventario-service
+    environment:
+      - DATABASE_URL=${INVENTARIO_DATABASE_URL}
+      - DIRECT_URL=${INVENTARIO_DIRECT_URL}
+      - JWT_SECRET=${JWT_SECRET}
+      - PORT=3002
+      - NODE_ENV=${NODE_ENV:-production}
+      - CORS_ORIGIN=${CORS_ORIGIN:-*}
+    networks:
+      - urbancar-net
+    restart: unless-stopped
+
+  # ── org-service (puerto 3003) ────────────────────────────────────────────────
+  org-service:
+    build: ./services/org-service
+    environment:
+      - DATABASE_URL=${ORG_DATABASE_URL}
+      - DIRECT_URL=${ORG_DIRECT_URL}
+      - JWT_SECRET=${JWT_SECRET}
+      - PORT=3003
+      - NODE_ENV=${NODE_ENV:-production}
+      - CORS_ORIGIN=${CORS_ORIGIN:-*}
+    networks:
+      - urbancar-net
+    restart: unless-stopped
+
+  # ── operaciones-service (puerto 3004) ────────────────────────────────────────
+  operaciones-service:
+    build: ./services/operaciones-service
+    environment:
+      - DATABASE_URL=${OPERACIONES_DATABASE_URL}
+      - DIRECT_URL=${OPERACIONES_DIRECT_URL}
+      - JWT_SECRET=${JWT_SECRET}
+      - PORT=3004
+      - NODE_ENV=${NODE_ENV:-production}
+      - CORS_ORIGIN=${CORS_ORIGIN:-*}
+      - INVENTARIO_SERVICE_URL=http://inventario-service:3002
+    networks:
+      - urbancar-net
+    restart: unless-stopped
+
+  # ── financiero-service (puerto 3005) ─────────────────────────────────────────
+  financiero-service:
+    build: ./services/financiero-service
+    environment:
+      - DATABASE_URL=${FINANCIERO_DATABASE_URL}
+      - DIRECT_URL=${FINANCIERO_DIRECT_URL}
+      - JWT_SECRET=${JWT_SECRET}
+      - PORT=3005
+      - NODE_ENV=${NODE_ENV:-production}
+      - CORS_ORIGIN=${CORS_ORIGIN:-*}
+    networks:
+      - urbancar-net
+    restart: unless-stopped
+
+  # ── mantenimiento-service (puerto 3006) ──────────────────────────────────────
+  mantenimiento-service:
+    build: ./services/mantenimiento-service
+    environment:
+      - DATABASE_URL=${MANTENIMIENTO_DATABASE_URL}
+      - DIRECT_URL=${MANTENIMIENTO_DIRECT_URL}
+      - JWT_SECRET=${JWT_SECRET}
+      - PORT=3006
+      - NODE_ENV=${NODE_ENV:-production}
+      - CORS_ORIGIN=${CORS_ORIGIN:-*}
+    networks:
+      - urbancar-net
+    restart: unless-stopped
+
+  # ── bus-service (puerto 3007) — API Gateway / Orquestador ────────────────────
+  bus-service:
+    build: ./services/bus-service
+    environment:
+      - JWT_SECRET=${JWT_SECRET}
+      - PORT=3007
+      - NODE_ENV=${NODE_ENV:-production}
+      - CORS_ORIGIN=${CORS_ORIGIN:-*}
+      - AZURE_SERVICEBUS_CONNECTION_STRING=${AZURE_SERVICEBUS_CONNECTION_STRING:-}
+      - AZURE_SERVICEBUS_TOPIC=${AZURE_SERVICEBUS_TOPIC:-urbancar-eventos}
+      - OPERACIONES_SERVICE_URL=http://operaciones-service:3004
+      - INVENTARIO_SERVICE_URL=http://inventario-service:3002
+      - FINANCIERO_SERVICE_URL=http://financiero-service:3005
+    depends_on:
+      - operaciones-service
+      - inventario-service
+      - financiero-service
+    networks:
+      - urbancar-net
+    restart: unless-stopped
+
+networks:
+  urbancar-net:
+    driver: bridge

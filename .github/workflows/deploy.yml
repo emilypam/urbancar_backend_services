@@ -1,0 +1,193 @@
+name: Deploy UrbanCar a Azure Container Apps
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+env:
+  ACR_SERVER: urbancarregistry.azurecr.io
+  RESOURCE_GROUP: urbancar-rg
+  ENVIRONMENT_NAME: urbancar-env
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout código
+        uses: actions/checkout@v4
+
+      - name: Login a Azure
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Login a Azure Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: urbancarregistry.azurecr.io
+          username: ${{ secrets.ACR_USERNAME }}
+          password: ${{ secrets.ACR_PASSWORD }}
+
+      - name: Build y push — auth-service
+        uses: docker/build-push-action@v5
+        with:
+          context: ./services/auth-service
+          push: true
+          tags: urbancarregistry.azurecr.io/auth-service:latest
+
+      - name: Build y push — inventario-service
+        uses: docker/build-push-action@v5
+        with:
+          context: ./services/inventario-service
+          push: true
+          tags: urbancarregistry.azurecr.io/inventario-service:latest
+
+      - name: Build y push — org-service
+        uses: docker/build-push-action@v5
+        with:
+          context: ./services/org-service
+          push: true
+          tags: urbancarregistry.azurecr.io/org-service:latest
+
+      - name: Build y push — operaciones-service
+        uses: docker/build-push-action@v5
+        with:
+          context: ./services/operaciones-service
+          push: true
+          tags: urbancarregistry.azurecr.io/operaciones-service:latest
+
+      - name: Build y push — financiero-service
+        uses: docker/build-push-action@v5
+        with:
+          context: ./services/financiero-service
+          push: true
+          tags: urbancarregistry.azurecr.io/financiero-service:latest
+
+      - name: Build y push — mantenimiento-service
+        uses: docker/build-push-action@v5
+        with:
+          context: ./services/mantenimiento-service
+          push: true
+          tags: urbancarregistry.azurecr.io/mantenimiento-service:latest
+
+      - name: Build y push — bus-service
+        uses: docker/build-push-action@v5
+        with:
+          context: ./services/bus-service
+          push: true
+          tags: urbancarregistry.azurecr.io/bus-service:latest
+
+      - name: Build y push — nginx-frontend
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile.nginx.containerapp
+          push: true
+          tags: urbancarregistry.azurecr.io/nginx-frontend:latest
+
+      - name: Registrar providers de Azure
+        run: |
+          az provider register --namespace Microsoft.App --wait
+          az provider register --namespace Microsoft.OperationalInsights --wait
+
+      - name: Crear Container Apps Environment (si no existe)
+        run: |
+          az containerapp env create \
+            --name $ENVIRONMENT_NAME \
+            --resource-group $RESOURCE_GROUP \
+            --location eastus2 \
+            --output none 2>/dev/null || echo "Environment ya existe"
+
+      - name: Deploy microservicios internos
+        run: |
+          deploy() {
+            NAME=$1; IMAGE=$2; PORT=$3; shift 3; ENVVARS="$@"
+            az containerapp create \
+              --name $NAME \
+              --resource-group $RESOURCE_GROUP \
+              --environment $ENVIRONMENT_NAME \
+              --image $ACR_SERVER/$IMAGE \
+              --registry-server $ACR_SERVER \
+              --registry-username ${{ secrets.ACR_USERNAME }} \
+              --registry-password ${{ secrets.ACR_PASSWORD }} \
+              --ingress internal --target-port $PORT \
+              --min-replicas 0 --max-replicas 2 \
+              --env-vars $ENVVARS \
+              --output none 2>/dev/null || \
+            az containerapp update \
+              --name $NAME \
+              --resource-group $RESOURCE_GROUP \
+              --image $ACR_SERVER/$IMAGE \
+              --output none
+            echo "  $NAME ✓"
+          }
+
+          deploy auth-service auth-service:latest 3001 \
+            "DATABASE_URL=${{ secrets.AUTH_DATABASE_URL }}" \
+            "DIRECT_URL=${{ secrets.AUTH_DIRECT_URL }}" \
+            "JWT_SECRET=${{ secrets.JWT_SECRET }}" \
+            "PORT=3001" "NODE_ENV=production" "CORS_ORIGIN=*"
+
+          deploy inventario-service inventario-service:latest 3002 \
+            "DATABASE_URL=${{ secrets.INVENTARIO_DATABASE_URL }}" \
+            "DIRECT_URL=${{ secrets.INVENTARIO_DIRECT_URL }}" \
+            "JWT_SECRET=${{ secrets.JWT_SECRET }}" \
+            "PORT=3002" "NODE_ENV=production" "CORS_ORIGIN=*"
+
+          deploy org-service org-service:latest 3003 \
+            "DATABASE_URL=${{ secrets.ORG_DATABASE_URL }}" \
+            "DIRECT_URL=${{ secrets.ORG_DIRECT_URL }}" \
+            "JWT_SECRET=${{ secrets.JWT_SECRET }}" \
+            "PORT=3003" "NODE_ENV=production" "CORS_ORIGIN=*"
+
+          deploy operaciones-service operaciones-service:latest 3004 \
+            "DATABASE_URL=${{ secrets.OPERACIONES_DATABASE_URL }}" \
+            "DIRECT_URL=${{ secrets.OPERACIONES_DIRECT_URL }}" \
+            "JWT_SECRET=${{ secrets.JWT_SECRET }}" \
+            "PORT=3004" "NODE_ENV=production" "CORS_ORIGIN=*" \
+            "INVENTARIO_SERVICE_URL=http://inventario-service"
+
+          deploy financiero-service financiero-service:latest 3005 \
+            "DATABASE_URL=${{ secrets.FINANCIERO_DATABASE_URL }}" \
+            "DIRECT_URL=${{ secrets.FINANCIERO_DIRECT_URL }}" \
+            "JWT_SECRET=${{ secrets.JWT_SECRET }}" \
+            "PORT=3005" "NODE_ENV=production" "CORS_ORIGIN=*"
+
+          deploy mantenimiento-service mantenimiento-service:latest 3006 \
+            "DATABASE_URL=${{ secrets.MANTENIMIENTO_DATABASE_URL }}" \
+            "DIRECT_URL=${{ secrets.MANTENIMIENTO_DIRECT_URL }}" \
+            "JWT_SECRET=${{ secrets.JWT_SECRET }}" \
+            "PORT=3006" "NODE_ENV=production" "CORS_ORIGIN=*"
+
+          deploy bus-service bus-service:latest 3007 \
+            "JWT_SECRET=${{ secrets.JWT_SECRET }}" \
+            "PORT=3007" "NODE_ENV=production" "CORS_ORIGIN=*" \
+            "AZURE_SERVICEBUS_CONNECTION_STRING=${{ secrets.AZURE_SERVICEBUS_CONNECTION_STRING }}" \
+            "AZURE_SERVICEBUS_TOPIC=urbancar-eventos" \
+            "OPERACIONES_SERVICE_URL=http://operaciones-service" \
+            "INVENTARIO_SERVICE_URL=http://inventario-service" \
+            "FINANCIERO_SERVICE_URL=http://financiero-service"
+
+      - name: Deploy nginx-frontend (externo)
+        run: |
+          APP_URL=$(az containerapp create \
+            --name nginx-frontend \
+            --resource-group $RESOURCE_GROUP \
+            --environment $ENVIRONMENT_NAME \
+            --image $ACR_SERVER/nginx-frontend:latest \
+            --registry-server $ACR_SERVER \
+            --registry-username ${{ secrets.ACR_USERNAME }} \
+            --registry-password ${{ secrets.ACR_PASSWORD }} \
+            --ingress external --target-port 80 \
+            --min-replicas 1 --max-replicas 3 \
+            --query properties.configuration.ingress.fqdn \
+            --output tsv 2>/dev/null || \
+          az containerapp update \
+            --name nginx-frontend \
+            --resource-group $RESOURCE_GROUP \
+            --image $ACR_SERVER/nginx-frontend:latest \
+            --query properties.configuration.ingress.fqdn \
+            --output tsv)
+          echo "✅ URL: https://$APP_URL"

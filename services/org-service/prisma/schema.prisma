@@ -1,0 +1,63 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model Provincia {
+  id        String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  nombre    String    @unique
+  codigo    String    @unique
+  createdAt DateTime? @default(now()) @map("created_at") @db.Timestamp(6)
+  ciudades  Ciudad[]
+
+  @@map("provincias")
+}
+
+model Ciudad {
+  id          String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  nombre      String
+  provinciaId String?   @map("provincia_id") @db.Uuid
+  createdAt   DateTime? @default(now()) @map("created_at") @db.Timestamp(6)
+  agencias    Agencia[]
+  provincia   Provincia? @relation(fields: [provinciaId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@unique([nombre, provinciaId])
+  @@map("ciudades")
+}
+
+model Empresa {
+  id        String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  nombre    String    @unique
+  ruc       String    @unique
+  email     String?
+  telefono  String?
+  logoUrl   String?   @map("logo_url")
+  isActive  Boolean?  @default(true) @map("is_active")
+  createdAt DateTime? @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt DateTime? @default(now()) @updatedAt @map("updated_at") @db.Timestamp(6)
+  agencias  Agencia[]
+
+  @@map("empresas")
+}
+
+model Agencia {
+  id        String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  empresaId String?   @map("empresa_id") @db.Uuid
+  ciudadId  String?   @map("ciudad_id") @db.Uuid
+  nombre    String?
+  direccion String?
+  telefono  String?
+  email     String?
+  isActive  Boolean?  @default(true) @map("is_active")
+  createdAt DateTime? @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt DateTime? @default(now()) @updatedAt @map("updated_at") @db.Timestamp(6)
+  ciudad    Ciudad?   @relation(fields: [ciudadId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  empresa   Empresa?  @relation(fields: [empresaId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@map("agencias")
+}

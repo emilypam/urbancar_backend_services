@@ -1,0 +1,57 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model Pago {
+  id         String       @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  reservaId  String?      @map("reserva_id") @db.Uuid
+  monto      Decimal?     @db.Decimal(10, 2)
+  metodoPago String?      @map("metodo_pago")
+  referencia String?
+  status     pago_status? @default(PENDIENTE)
+  createdAt  DateTime?    @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt  DateTime?    @default(now()) @updatedAt @map("updated_at") @db.Timestamp(6)
+
+  @@map("pagos")
+}
+
+model Factura {
+  id            String           @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  reservaId     String?          @map("reserva_id") @db.Uuid
+  pagoId        String?          @unique @map("pago_id") @db.Uuid
+  numeroFactura String?          @unique @map("numero_factura")
+  rucCliente    String?          @map("ruc_cliente")
+  razonSocial   String?          @map("razon_social")
+  subtotal      Decimal?         @db.Decimal(10, 2)
+  iva           Decimal?         @db.Decimal(10, 2)
+  total         Decimal?         @db.Decimal(10, 2)
+  createdAt     DateTime?        @default(now()) @map("created_at") @db.Timestamp(6)
+  detalles      DetalleFactura[]
+
+  @@map("facturas")
+}
+
+model DetalleFactura {
+  id          String   @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  facturaId   String?  @map("factura_id") @db.Uuid
+  descripcion String?
+  cantidad    Int?     @default(1)
+  precioUnit  Decimal? @map("precio_unit") @db.Decimal(10, 2)
+  subtotal    Decimal? @db.Decimal(10, 2)
+  factura     Factura? @relation(fields: [facturaId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@map("detalle_factura")
+}
+
+enum pago_status {
+  PENDIENTE
+  COMPLETADO
+  FALLIDO
+  REEMBOLSADO
+}

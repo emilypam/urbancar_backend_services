@@ -1,0 +1,24 @@
+import prisma from './database/prisma.js';
+import { VehiculoRepository }        from '../modules/vehiculos/vehiculo.repository.js';
+import { VehiculoController }        from '../modules/vehiculos/vehiculo.controller.js';
+import { MarcaRepository }           from '../modules/marcas/marca.repository.js';
+import { MarcaController }           from '../modules/marcas/marca.controller.js';
+import { ModeloRepository }          from '../modules/modelos/modelo.repository.js';
+import { ModeloController }          from '../modules/modelos/modelo.controller.js';
+import { CategoriaRepository }       from '../modules/categorias/categoria.repository.js';
+import { CategoriaController }       from '../modules/categorias/categoria.controller.js';
+import { TipoCombustibleRepository } from '../modules/tipos-combustible/tipo-combustible.repository.js';
+import { TipoCombustibleController } from '../modules/tipos-combustible/tipo-combustible.controller.js';
+import { TipoTransmisionRepository } from '../modules/tipos-transmision/tipo-transmision.repository.js';
+import { TipoTransmisionController } from '../modules/tipos-transmision/tipo-transmision.controller.js';
+import { ExtraRepository }           from '../modules/extras/extra.repository.js';
+import { ExtraController }           from '../modules/extras/extra.controller.js';
+
+export const vehiculoRepository        = new VehiculoRepository(prisma);
+export const vehiculoController        = new VehiculoController(vehiculoRepository);
+export const marcaController           = new MarcaController(new MarcaRepository(prisma));
+export const modeloController          = new ModeloController(new ModeloRepository(prisma));
+export const categoriaController       = new CategoriaController(new CategoriaRepository(prisma));
+export const tipoCombustibleController = new TipoCombustibleController(new TipoCombustibleRepository(prisma));
+export const tipoTransmisionController = new TipoTransmisionController(new TipoTransmisionRepository(prisma));
+export const extraController           = new ExtraController(new ExtraRepository(prisma));

@@ -1,0 +1,104 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model Marca {
+  id        String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  nombre    String?   @unique
+  logoUrl   String?   @map("logo_url")
+  createdAt DateTime? @default(now()) @map("created_at") @db.Timestamp(6)
+  modelos   Modelo[]
+
+  @@map("marcas")
+}
+
+model Modelo {
+  id        String     @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  marcaId   String?    @map("marca_id") @db.Uuid
+  nombre    String?
+  createdAt DateTime?  @default(now()) @map("created_at") @db.Timestamp(6)
+  marca     Marca?     @relation(fields: [marcaId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  vehiculos Vehiculo[]
+
+  @@unique([marcaId, nombre])
+  @@map("modelos")
+}
+
+model Categoria {
+  id          String     @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  nombre      String?    @unique
+  descripcion String?
+  createdAt   DateTime?  @default(now()) @map("created_at") @db.Timestamp(6)
+  vehiculos   Vehiculo[]
+
+  @@map("categorias")
+}
+
+model TipoCombustible {
+  id        String     @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  nombre    String?    @unique
+  vehiculos Vehiculo[]
+
+  @@map("tipos_combustible")
+}
+
+model TipoTransmision {
+  id        String     @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  nombre    String?    @unique
+  vehiculos Vehiculo[]
+
+  @@map("tipos_transmision")
+}
+
+model ExtraEquipamiento {
+  id          String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  nombre      String?   @unique
+  descripcion String?
+  precioDia   Decimal?  @map("precio_dia") @db.Decimal(10, 2)
+  isActive    Boolean?  @default(true) @map("is_active")
+  createdAt   DateTime? @default(now()) @map("created_at") @db.Timestamp(6)
+
+  @@map("extras_equipamiento")
+}
+
+model Vehiculo {
+  id                String           @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  agenciaId         String?          @map("agencia_id") @db.Uuid
+  modeloId          String?          @map("modelo_id") @db.Uuid
+  categoriaId       String?          @map("categoria_id") @db.Uuid
+  tipoCombustibleId String?          @map("tipo_combustible_id") @db.Uuid
+  tipoTransmisionId String?          @map("tipo_transmision_id") @db.Uuid
+  placa             String?          @unique
+  color             String?
+  anio              Int?
+  kilometraje       Int?             @default(0)
+  numeroPasajeros   Int?             @default(5) @map("numero_pasajeros")
+  precioDia         Decimal?         @map("precio_dia") @db.Decimal(10, 2)
+  imagenUrl         String?          @map("imagen_url")
+  descripcion       String?
+  status            vehicle_status?  @default(DISPONIBLE)
+  isActive          Boolean?         @default(true) @map("is_active")
+  deletedAt         DateTime?        @map("deleted_at") @db.Timestamp(6)
+  createdAt         DateTime?        @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt         DateTime?        @default(now()) @updatedAt @map("updated_at") @db.Timestamp(6)
+  modelo            Modelo?          @relation(fields: [modeloId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  categoria         Categoria?       @relation(fields: [categoriaId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  tipoCombustible   TipoCombustible? @relation(fields: [tipoCombustibleId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  tipoTransmision   TipoTransmision? @relation(fields: [tipoTransmisionId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@map("vehiculos")
+}
+
+enum vehicle_status {
+  DISPONIBLE
+  RESERVADO
+  EN_USO
+  MANTENIMIENTO
+  INACTIVO
+}

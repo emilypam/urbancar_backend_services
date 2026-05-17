@@ -1,0 +1,27 @@
+# Dependencias
+node_modules/
+dist/
+
+# Variables de entorno (NUNCA subir al repo)
+.env
+.env.local
+
+# Logs
+*.log
+npm-debug.log*
+
+# Build outputs
+services/*/dist/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# Angular cache
+.angular/
+UrbanCar_Front/.angular/
+UrbanCar_Front/dist/
