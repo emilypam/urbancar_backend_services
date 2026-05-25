@@ -3,13 +3,86 @@ import { AlquilerRepository } from './alquiler.repository.js';
 import { NotFoundException, ValidationException } from '../../shared/errors/BusinessException.js';
 import prisma from '../../shared/database/prisma.js';
 
-const INVENTARIO_URL = process.env['INVENTARIO_SERVICE_URL'] ?? 'http://localhost:3002';
+const INVENTARIO_URL     = process.env['INVENTARIO_SERVICE_URL']     ?? 'http://localhost:3002';
+const MANTENIMIENTO_URL  = process.env['MANTENIMIENTO_SERVICE_URL']  ?? 'http://localhost:3006';
+const FINANCIERO_URL     = process.env['FINANCIERO_SERVICE_URL']     ?? 'http://localhost:3005';
+
+async function fetchInventario<T>(path: string): Promise<T | null> {
+  try {
+    const res = await fetch(`${INVENTARIO_URL}${path}`);
+    if (!res.ok) return null;
+    const body = await res.json() as { success: boolean; data: T };
+    return body.success ? body.data : null;
+  } catch { return null; }
+}
+
+async function enrichAlquileresWithVehiculos(alquileres: any[]): Promise<any[]> {
+  const ids = [...new Set(
+    alquileres.map((a) => a.reserva?.vehiculoId).filter(Boolean)
+  )] as string[];
+  if (!ids.length) return alquileres;
+  const fetched = await Promise.all(
+    ids.map((id) => fetchInventario<any>(`/api/v1/emilypamela/vehiculos/${id}`)),
+  );
+  const vehiculoMap = new Map<string, any>(ids.map((id, i) => [id, fetched[i]]));
+  return alquileres.map((a) => ({
+    ...a,
+    reserva: a.reserva
+      ? { ...a.reserva, vehiculo: vehiculoMap.get(a.reserva.vehiculoId) ?? null }
+      : a.reserva,
+  }));
+}
 
 async function patchVehiculoStatus(vehiculoId: string, data: object, authHeader?: string) {
   fetch(`${INVENTARIO_URL}/api/v1/emilypamela/vehiculos/${vehiculoId}`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json', Authorization: authHeader ?? '' },
     body: JSON.stringify(data),
+  }).catch(() => {});
+}
+
+function postKardex(
+  vehiculoId: string, evento: string,
+  estadoAnterior: string, estadoNuevo: string,
+  authHeader?: string,
+): void {
+  fetch(`${MANTENIMIENTO_URL}/api/v1/emilypamela/kardex`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: authHeader ?? '' },
+    body: JSON.stringify({ vehiculoId, evento, estadoAnterior, estadoNuevo }),
+  }).catch(() => {});
+}
+
+function buildDetallesFactura(reserva: any, cargoExtra: number): object[] {
+  const detalles: object[] = [];
+  if (Number(reserva.precioBase) > 0) {
+    detalles.push({ descripcion: `Renta del vehículo (${reserva.diasTotal ?? 1} días)`, cantidad: 1, precioUnit: Number(reserva.precioBase) });
+  }
+  if (Number(reserva.precioSeguro) > 0) {
+    detalles.push({ descripcion: 'Seguro', cantidad: 1, precioUnit: Number(reserva.precioSeguro) });
+  }
+  if (Number(reserva.precioExtras) > 0) {
+    detalles.push({ descripcion: 'Extras', cantidad: 1, precioUnit: Number(reserva.precioExtras) });
+  }
+  if (cargoExtra > 0) {
+    detalles.push({ descripcion: 'Cargo adicional por devolución', cantidad: 1, precioUnit: Number(cargoExtra) });
+  }
+  return detalles;
+}
+
+function postFactura(reservaId: string, detalles: object[], authHeader?: string): void {
+  fetch(`${FINANCIERO_URL}/api/v1/emilypamela/facturas`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: authHeader ?? '' },
+    body: JSON.stringify({ reservaId, detalles }),
+  }).catch(() => {});
+}
+
+async function createOutboxEvent(
+  evento: string, usuarioId?: string | null, correlationId?: string | null, payload?: object,
+): Promise<void> {
+  await prisma.outboxEvent.create({
+    data: { evento, usuarioId, correlationId, payload: payload as any },
   }).catch(() => {});
 }
 
@@ -21,7 +94,9 @@ export class AlquilerController {
       const page   = Number(req.query.page)  || 1;
       const limit  = Number(req.query.limit) || 20;
       const status = req.query['status'] as string | undefined;
-      res.json({ success: true, data: await this.alquilerRepository.findAll(page, limit, status) });
+      const result = await this.alquilerRepository.findAll(page, limit, status);
+      const enriched = await enrichAlquileresWithVehiculos(result.data);
+      res.json({ success: true, data: { ...result, data: enriched } });
     } catch (err) { next(err); }
   };
 
@@ -62,7 +137,11 @@ export class AlquilerController {
 
       if (reserva.vehiculoId) {
         patchVehiculoStatus(reserva.vehiculoId, { status: 'EN_USO' }, req.headers.authorization);
+        postKardex(reserva.vehiculoId, 'ALQUILER_INICIADO', 'DISPONIBLE', 'EN_USO', req.headers.authorization);
       }
+      void createOutboxEvent('ALQUILER_INICIADO', reserva.usuarioId, alquiler.id, {
+        alquilerId: alquiler.id, reservaId, vehiculoId: reserva.vehiculoId,
+      });
 
       res.status(201).json({ success: true, data: await this.alquilerRepository.findById(alquiler.id) });
     } catch (err) { next(err); }
@@ -112,7 +191,14 @@ export class AlquilerController {
 
       if (reservaObj?.vehiculoId) {
         patchVehiculoStatus(reservaObj.vehiculoId, { status: 'DISPONIBLE', kilometraje: kmEntrada }, req.headers.authorization);
+        postKardex(reservaObj.vehiculoId, 'DEVOLUCION_REGISTRADA', 'EN_USO', 'DISPONIBLE', req.headers.authorization);
       }
+      if (reservaObj) {
+        postFactura(alquiler.reservaId!, buildDetallesFactura(reservaObj, cargoExtra), req.headers.authorization);
+      }
+      void createOutboxEvent('DEVOLUCION_REGISTRADA', alquiler.reservaId, devolucion.id, {
+        devolucionId: devolucion.id, alquilerId: req.params['id'], vehiculoId: reservaObj?.vehiculoId,
+      });
 
       res.status(201).json({ success: true, data: devolucion });
     } catch (err) { next(err); }
@@ -147,7 +233,14 @@ export class AlquilerController {
 
       if (reservaObj?.vehiculoId) {
         patchVehiculoStatus(reservaObj.vehiculoId, { status: 'DISPONIBLE', kilometraje: kmEntrada }, req.headers.authorization);
+        postKardex(reservaObj.vehiculoId, 'DEVOLUCION_REGISTRADA', 'EN_USO', 'DISPONIBLE', req.headers.authorization);
       }
+      if (reservaObj) {
+        postFactura(alquiler.reservaId!, buildDetallesFactura(reservaObj, cargoExtra), req.headers.authorization);
+      }
+      void createOutboxEvent('DEVOLUCION_REGISTRADA', alquiler.reservaId, devolucion.id, {
+        devolucionId: devolucion.id, alquilerId, vehiculoId: reservaObj?.vehiculoId,
+      });
 
       res.status(201).json({ success: true, data: devolucion });
     } catch (err) { next(err); }

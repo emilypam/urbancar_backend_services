@@ -74,6 +74,8 @@ services:
       - NODE_ENV=${NODE_ENV:-production}
       - CORS_ORIGIN=${CORS_ORIGIN:-*}
       - INVENTARIO_SERVICE_URL=http://inventario-service:3002
+      - MANTENIMIENTO_SERVICE_URL=http://mantenimiento-service:3006
+      - FINANCIERO_SERVICE_URL=http://financiero-service:3005
     networks:
       - urbancar-net
     restart: unless-stopped

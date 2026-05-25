@@ -140,7 +140,9 @@ jobs:
             "DIRECT_URL=${{ secrets.OPERACIONES_DIRECT_URL }}" \
             "JWT_SECRET=${{ secrets.JWT_SECRET }}" \
             "PORT=3004" "NODE_ENV=production" "CORS_ORIGIN=*" \
-            "INVENTARIO_SERVICE_URL=http://inventario-service"
+            "INVENTARIO_SERVICE_URL=http://inventario-service" \
+            "MANTENIMIENTO_SERVICE_URL=http://mantenimiento-service" \
+            "FINANCIERO_SERVICE_URL=http://financiero-service"
 
           deploy financiero-service financiero-service:latest 3005 \
             "DATABASE_URL=${{ secrets.FINANCIERO_DATABASE_URL }}" \
