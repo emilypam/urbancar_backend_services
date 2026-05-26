@@ -113,6 +113,7 @@ jobs:
               --resource-group $RESOURCE_GROUP \
               --image $ACR_SERVER/$IMAGE \
               --min-replicas 1 \
+              --env-vars $ENVVARS \
               --output none
             echo "  $NAME ✓"
           }
