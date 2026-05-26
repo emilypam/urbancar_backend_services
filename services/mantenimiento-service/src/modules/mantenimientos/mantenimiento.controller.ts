@@ -19,7 +19,9 @@ function syncKardex(vehiculoId: string, estadoAnterior: string, estadoNuevo: str
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${serviceToken()}` },
     body: JSON.stringify({ vehiculoId, estadoAnterior, estadoNuevo, evento, referencia }),
-  }).catch(() => {});
+  }).then(async (r) => {
+    if (!r.ok) console.error('❌ syncKardex HTTP', r.status, await r.text().catch(() => ''));
+  }).catch((err) => console.error('❌ syncKardex fetch:', err));
 }
 
 export class MantenimientoController {
