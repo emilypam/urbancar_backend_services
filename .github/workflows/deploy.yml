@@ -149,7 +149,8 @@ jobs:
             "DATABASE_URL=${{ secrets.FINANCIERO_DATABASE_URL }}" \
             "DIRECT_URL=${{ secrets.FINANCIERO_DIRECT_URL }}" \
             "JWT_SECRET=${{ secrets.JWT_SECRET }}" \
-            "PORT=3005" "NODE_ENV=production" "CORS_ORIGIN=*"
+            "PORT=3005" "NODE_ENV=production" "CORS_ORIGIN=*" \
+            "OPERACIONES_SERVICE_URL=http://operaciones-service"
 
           deploy mantenimiento-service mantenimiento-service:latest 3006 \
             "DATABASE_URL=${{ secrets.MANTENIMIENTO_DATABASE_URL }}" \
