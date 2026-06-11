@@ -1,0 +1,26 @@
+{
+  "expo": {
+    "name": "UrbanCar",
+    "slug": "urbancar-mobile",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.urbancar.mobile"
+    },
+    "android": {
+      "package": "com.urbancar.mobile",
+      "versionCode": 1
+    },
+    "plugins": [
+      "@react-native-community/datetimepicker",
+      "expo-font"
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "urbancar-mobile"
+      }
+    }
+  }
+}
