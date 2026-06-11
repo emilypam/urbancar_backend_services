@@ -1,46 +1,37 @@
-import { ServiceBusClient, ServiceBusSender } from '@azure/service-bus';
 import { randomUUID } from 'crypto';
-import { BusEvent, EventType } from './event-types.js';
+import { getChannel, isConnected, EXCHANGE } from './rabbitmq.js';
+import { EventType, DomainEvent, EVENT_TYPE_TO_ROUTING_KEY } from './event-types.js';
 
-const inMemoryLog: BusEvent[] = [];
-let sender: ServiceBusSender | null = null;
-
-function initSender(): void {
-  const connStr = process.env.AZURE_SERVICEBUS_CONNECTION_STRING;
-  const topic   = process.env.AZURE_SERVICEBUS_TOPIC ?? 'urbancar-eventos';
-  if (!connStr) {
-    console.warn('[bus-service] AZURE_SERVICEBUS_CONNECTION_STRING no configurado — modo local activo');
-    return;
-  }
-  try {
-    const client = new ServiceBusClient(connStr);
-    sender = client.createSender(topic);
-    console.log(`[bus-service] Azure Service Bus conectado → topic: ${topic}`);
-  } catch (err) {
-    console.error('[bus-service] Error al conectar Azure Service Bus:', err);
-  }
-}
-
-initSender();
+const inMemoryLog: DomainEvent[] = [];
 
 export async function publishEvent(
   tipo: EventType,
   usuarioId: string,
-  entidadId: string,
-  payload: Record<string, unknown>,
-): Promise<BusEvent> {
-  const event: BusEvent = {
-    id: randomUUID(),
-    tipo,
+  correlationId: string,
+  data: Record<string, unknown>,
+): Promise<DomainEvent> {
+  const routingKey = EVENT_TYPE_TO_ROUTING_KEY[tipo];
+
+  const event: DomainEvent = {
+    eventId:      randomUUID(),
+    eventType:    routingKey,
+    eventVersion: '2.0',
+    timestamp:    new Date().toISOString(),
+    correlationId,
+    source:       'bus-service',
     usuarioId,
-    entidadId,
-    payload,
-    publicadoEn: new Date().toISOString(),
-    destino: sender ? 'azure-service-bus' : 'local',
+    data,
   };
 
-  if (sender) {
-    await sender.sendMessages({ body: event, contentType: 'application/json', subject: tipo });
+  const ch = getChannel();
+  if (ch) {
+    ch.publish(
+      EXCHANGE,
+      routingKey,
+      Buffer.from(JSON.stringify(event)),
+      { contentType: 'application/json', persistent: true, messageId: event.eventId },
+    );
+    console.log(`[bus-service] ✉️  ${routingKey} → ${event.eventId}`);
   } else {
     console.log('[bus-service][local-event]', JSON.stringify(event));
   }
@@ -52,14 +43,14 @@ export async function publishEvent(
 }
 
 export function isSenderConnected(): boolean {
-  return sender !== null;
+  return isConnected();
 }
 
 export function getEventLog(page: number, limit: number) {
   const start = (page - 1) * limit;
   return {
-    items: inMemoryLog.slice(start, start + limit),
-    total: inMemoryLog.length,
+    items:      inMemoryLog.slice(start, start + limit),
+    total:      inMemoryLog.length,
     page,
     limit,
     totalPages: Math.ceil(inMemoryLog.length / limit),

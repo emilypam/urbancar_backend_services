@@ -40,5 +40,6 @@ jobs:
             --name mantenimiento-service \
             --resource-group $RESOURCE_GROUP \
             --image $ACR_SERVER/mantenimiento-service:latest \
+            --set-env-vars "RABBITMQ_URL=${{ secrets.RABBITMQ_URL }}" \
             --output none
           echo "mantenimiento-service desplegado ✓"

@@ -8,6 +8,8 @@ import { createSistemaExternoRouter } from './modules/sistemas/sistema-externo.r
 import { mantenimientoController, kardexController, sistemaExternoController } from './shared/container.js';
 import { errorHandler } from './shared/errors/error.middleware.js';
 import { swaggerSpec } from './shared/swagger.js';
+import { connectRabbitMQ } from './messaging/rabbitmq.js';
+import { createMantenimientoV2Router } from './modules/mantenimientos/v2/mantenimiento.routes.v2.js';
 
 const app = express();
 
@@ -24,6 +26,10 @@ app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 app.use('/api/v1/emilypamela/mantenimientos',    createMantenimientoRouter(mantenimientoController));
 app.use('/api/v1/emilypamela/kardex',            createKardexRouter(kardexController));
 app.use('/api/v1/emilypamela/sistemas-externos', createSistemaExternoRouter(sistemaExternoController));
+
+// V2 — mantenimientos con mensajería RabbitMQ
+connectRabbitMQ('mantenimiento-service');
+app.use('/api/v2/emilypamela/mantenimientos', createMantenimientoV2Router());
 
 app.use(errorHandler);
 

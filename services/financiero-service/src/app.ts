@@ -8,6 +8,8 @@ import { pagoRepository, pagoController, facturaController } from './shared/cont
 import { createPaymentBookingRouter } from './modules/booking-integration/payment-booking.routes.js';
 import { errorHandler } from './shared/errors/error.middleware.js';
 import { swaggerSpec } from './shared/swagger.js';
+import { connectRabbitMQ } from './messaging/rabbitmq.js';
+import { createPagoV2Router } from './modules/pagos/v2/pago.routes.v2.js';
 
 const app = express();
 
@@ -26,6 +28,10 @@ app.use('/api/v1/emilypamela/payment/booking', createPaymentBookingRouter(pagoRe
 
 app.use('/api/v1/emilypamela/pagos',    createPagoRouter(pagoController));
 app.use('/api/v1/emilypamela/facturas', createFacturaRouter(facturaController));
+
+// V2 — pagos con mensajería RabbitMQ
+connectRabbitMQ('financiero-service');
+app.use('/api/v2/emilypamela/pagos', createPagoV2Router());
 
 app.use(errorHandler);
 

@@ -1,4 +1,4 @@
-name: Deploy operaciones-service
+name: Deploy bus-service
 
 on:
   push:
@@ -32,14 +32,14 @@ jobs:
         with:
           context: .
           push: true
-          tags: urbancarregistry.azurecr.io/operaciones-service:latest
+          tags: urbancarregistry.azurecr.io/bus-service:latest
 
       - name: Deploy a Container Apps
         run: |
           az containerapp update \
-            --name operaciones-service \
+            --name bus-service \
             --resource-group $RESOURCE_GROUP \
-            --image $ACR_SERVER/operaciones-service:latest \
+            --image $ACR_SERVER/bus-service:latest \
             --set-env-vars "RABBITMQ_URL=${{ secrets.RABBITMQ_URL }}" \
             --output none
-          echo "operaciones-service desplegado ✓"
+          echo "bus-service desplegado ✓"

@@ -2,6 +2,24 @@ version: '3.9'
 
 services:
 
+  # ── RabbitMQ Event Bus ────────────────────────────────────────────────────────
+  rabbitmq:
+    image: rabbitmq:3-management
+    ports:
+      - '5672:5672'
+      - '15672:15672'
+    environment:
+      - RABBITMQ_DEFAULT_USER=urbancar
+      - RABBITMQ_DEFAULT_PASS=urbancar123
+    healthcheck:
+      test: ['CMD', 'rabbitmq-diagnostics', 'ping']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - urbancar-net
+    restart: unless-stopped
+
   # ── API Gateway ─────────────────────────────────────────────────────────────
   nginx:
     build:
@@ -45,6 +63,10 @@ services:
       - PORT=3002
       - NODE_ENV=${NODE_ENV:-production}
       - CORS_ORIGIN=${CORS_ORIGIN:-*}
+      - RABBITMQ_URL=amqp://urbancar:urbancar123@rabbitmq:5672
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
     networks:
       - urbancar-net
     restart: unless-stopped
@@ -76,6 +98,10 @@ services:
       - INVENTARIO_SERVICE_URL=http://inventario-service:3002
       - MANTENIMIENTO_SERVICE_URL=http://mantenimiento-service:3006
       - FINANCIERO_SERVICE_URL=http://financiero-service:3005
+      - RABBITMQ_URL=amqp://urbancar:urbancar123@rabbitmq:5672
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
     networks:
       - urbancar-net
     restart: unless-stopped
@@ -90,6 +116,10 @@ services:
       - PORT=3005
       - NODE_ENV=${NODE_ENV:-production}
       - CORS_ORIGIN=${CORS_ORIGIN:-*}
+      - RABBITMQ_URL=amqp://urbancar:urbancar123@rabbitmq:5672
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
     networks:
       - urbancar-net
     restart: unless-stopped
@@ -104,6 +134,10 @@ services:
       - PORT=3006
       - NODE_ENV=${NODE_ENV:-production}
       - CORS_ORIGIN=${CORS_ORIGIN:-*}
+      - RABBITMQ_URL=amqp://urbancar:urbancar123@rabbitmq:5672
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
     networks:
       - urbancar-net
     restart: unless-stopped
@@ -116,15 +150,19 @@ services:
       - PORT=3007
       - NODE_ENV=${NODE_ENV:-production}
       - CORS_ORIGIN=${CORS_ORIGIN:-*}
-      - AZURE_SERVICEBUS_CONNECTION_STRING=${AZURE_SERVICEBUS_CONNECTION_STRING:-}
-      - AZURE_SERVICEBUS_TOPIC=${AZURE_SERVICEBUS_TOPIC:-urbancar-eventos}
+      - RABBITMQ_URL=amqp://urbancar:urbancar123@rabbitmq:5672
       - OPERACIONES_SERVICE_URL=http://operaciones-service:3004
       - INVENTARIO_SERVICE_URL=http://inventario-service:3002
       - FINANCIERO_SERVICE_URL=http://financiero-service:3005
     depends_on:
-      - operaciones-service
-      - inventario-service
-      - financiero-service
+      rabbitmq:
+        condition: service_healthy
+      operaciones-service:
+        condition: service_started
+      inventario-service:
+        condition: service_started
+      financiero-service:
+        condition: service_started
     networks:
       - urbancar-net
     restart: unless-stopped

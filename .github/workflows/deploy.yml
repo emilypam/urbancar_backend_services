@@ -92,8 +92,31 @@ jobs:
             --location eastus2 \
             --output none 2>/dev/null || echo "Environment ya existe"
 
+      - name: Deploy RabbitMQ
+        run: |
+          az containerapp create \
+            --name rabbitmq \
+            --resource-group $RESOURCE_GROUP \
+            --environment $ENVIRONMENT_NAME \
+            --image rabbitmq:3-management \
+            --ingress internal --target-port 5672 \
+            --transport tcp \
+            --min-replicas 1 --max-replicas 1 \
+            --env-vars \
+              "RABBITMQ_DEFAULT_USER=urbancar" \
+              "RABBITMQ_DEFAULT_PASS=urbancar123" \
+            --output none 2>/dev/null || \
+          az containerapp update \
+            --name rabbitmq \
+            --resource-group $RESOURCE_GROUP \
+            --image rabbitmq:3-management \
+            --output none
+          echo "  rabbitmq ✓"
+
       - name: Deploy microservicios internos
         run: |
+          RABBITMQ_URL="amqp://urbancar:urbancar123@rabbitmq:5672"
+
           deploy() {
             NAME=$1; IMAGE=$2; PORT=$3; shift 3; ENVVARS="$@"
             az containerapp create \
@@ -128,7 +151,8 @@ jobs:
             "DATABASE_URL=${{ secrets.INVENTARIO_DATABASE_URL }}" \
             "DIRECT_URL=${{ secrets.INVENTARIO_DIRECT_URL }}" \
             "JWT_SECRET=${{ secrets.JWT_SECRET }}" \
-            "PORT=3002" "NODE_ENV=production" "CORS_ORIGIN=*"
+            "PORT=3002" "NODE_ENV=production" "CORS_ORIGIN=*" \
+            "RABBITMQ_URL=$RABBITMQ_URL"
 
           deploy org-service org-service:latest 3003 \
             "DATABASE_URL=${{ secrets.ORG_DATABASE_URL }}" \
@@ -143,27 +167,29 @@ jobs:
             "PORT=3004" "NODE_ENV=production" "CORS_ORIGIN=*" \
             "INVENTARIO_SERVICE_URL=http://inventario-service" \
             "MANTENIMIENTO_SERVICE_URL=http://mantenimiento-service" \
-            "FINANCIERO_SERVICE_URL=http://financiero-service"
+            "FINANCIERO_SERVICE_URL=http://financiero-service" \
+            "RABBITMQ_URL=$RABBITMQ_URL"
 
           deploy financiero-service financiero-service:latest 3005 \
             "DATABASE_URL=${{ secrets.FINANCIERO_DATABASE_URL }}" \
             "DIRECT_URL=${{ secrets.FINANCIERO_DIRECT_URL }}" \
             "JWT_SECRET=${{ secrets.JWT_SECRET }}" \
             "PORT=3005" "NODE_ENV=production" "CORS_ORIGIN=*" \
-            "OPERACIONES_SERVICE_URL=http://operaciones-service"
+            "OPERACIONES_SERVICE_URL=http://operaciones-service" \
+            "RABBITMQ_URL=$RABBITMQ_URL"
 
           deploy mantenimiento-service mantenimiento-service:latest 3006 \
             "DATABASE_URL=${{ secrets.MANTENIMIENTO_DATABASE_URL }}" \
             "DIRECT_URL=${{ secrets.MANTENIMIENTO_DIRECT_URL }}" \
             "JWT_SECRET=${{ secrets.JWT_SECRET }}" \
             "PORT=3006" "NODE_ENV=production" "CORS_ORIGIN=*" \
-            "OPERACIONES_SERVICE_URL=http://operaciones-service"
+            "OPERACIONES_SERVICE_URL=http://operaciones-service" \
+            "RABBITMQ_URL=$RABBITMQ_URL"
 
           deploy bus-service bus-service:latest 3007 \
             "JWT_SECRET=${{ secrets.JWT_SECRET }}" \
             "PORT=3007" "NODE_ENV=production" "CORS_ORIGIN=*" \
-            "AZURE_SERVICEBUS_CONNECTION_STRING=${{ secrets.AZURE_SERVICEBUS_CONNECTION_STRING }}" \
-            "AZURE_SERVICEBUS_TOPIC=urbancar-eventos" \
+            "RABBITMQ_URL=$RABBITMQ_URL" \
             "OPERACIONES_SERVICE_URL=http://operaciones-service" \
             "INVENTARIO_SERVICE_URL=http://inventario-service" \
             "FINANCIERO_SERVICE_URL=http://financiero-service"

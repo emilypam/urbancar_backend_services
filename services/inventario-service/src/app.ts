@@ -22,6 +22,11 @@ import {
 import { createVehiculoBookingRouter } from './modules/booking-integration/vehiculo-booking.routes.js';
 import { errorHandler } from './shared/errors/error.middleware.js';
 import { swaggerSpec } from './shared/swagger.js';
+import { connectRabbitMQ } from './messaging/rabbitmq.js';
+import { startReservaCreadaConsumer }    from './messaging/consumers/reserva-creada.consumer.js';
+import { startReservaCanceladaConsumer } from './messaging/consumers/reserva-cancelada.consumer.js';
+import { startReservaConfirmadaConsumer } from './messaging/consumers/reserva-confirmada.consumer.js';
+import { startVehiculoMantenimientoConsumer } from './messaging/consumers/vehiculo-mantenimiento.consumer.js';
 
 const app = express();
 
@@ -56,6 +61,14 @@ app.use('/api/v1/emilypamela/categorias',        createCategoriaRouter(categoria
 app.use('/api/v1/emilypamela/tipos-combustible', createTipoCombustibleRouter(tipoCombustibleController));
 app.use('/api/v1/emilypamela/tipos-transmision', createTipoTransmisionRouter(tipoTransmisionController));
 app.use('/api/v1/emilypamela/extras',            createExtraRouter(extraController));
+
+// V2 — iniciar consumers RabbitMQ para actualizaciones de estado de vehículos
+connectRabbitMQ('inventario-service').then(async () => {
+  await startReservaCreadaConsumer();
+  await startReservaCanceladaConsumer();
+  await startReservaConfirmadaConsumer();
+  await startVehiculoMantenimientoConsumer();
+});
 
 app.use(errorHandler);
 
