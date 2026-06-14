@@ -19,8 +19,15 @@
     ],
     "extra": {
       "eas": {
-        "projectId": "urbancar-mobile"
+        "projectId": "48bf81ed-e33d-4bbc-909f-f846ca75f814"
       }
+    },
+    "owner": "emilypamelas-team",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/48bf81ed-e33d-4bbc-909f-f846ca75f814"
     }
   }
 }
