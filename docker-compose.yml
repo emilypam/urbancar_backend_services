@@ -35,6 +35,7 @@ services:
       - financiero-service
       - mantenimiento-service
       - bus-service
+      - graphql-gateway
     networks:
       - urbancar-net
 
@@ -163,6 +164,27 @@ services:
         condition: service_started
       financiero-service:
         condition: service_started
+    networks:
+      - urbancar-net
+    restart: unless-stopped
+
+  # ── graphql-gateway (puerto 3008) ───────────────────────────────────────────
+  graphql-gateway:
+    build: ./services/graphql-gateway
+    environment:
+      - PORT=3008
+      - NODE_ENV=${NODE_ENV:-production}
+      - INVENTARIO_SERVICE_URL=http://inventario-service:3002
+      - OPERACIONES_SERVICE_URL=http://operaciones-service:3004
+      - FINANCIERO_SERVICE_URL=http://financiero-service:3005
+      - MANTENIMIENTO_SERVICE_URL=http://mantenimiento-service:3006
+      - BUS_SERVICE_URL=http://bus-service:3007
+    depends_on:
+      - inventario-service
+      - operaciones-service
+      - financiero-service
+      - mantenimiento-service
+      - bus-service
     networks:
       - urbancar-net
     restart: unless-stopped
