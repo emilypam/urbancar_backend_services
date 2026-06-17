@@ -31,4 +31,11 @@ export class AuthController {
       res.json({ success: true, data: user });
     } catch (err) { next(err); }
   };
+
+  changePassword = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const result = await this.authService.changePassword(req.user!.id, req.body);
+      res.json({ success: true, data: result });
+    } catch (err) { next(err); }
+  };
 }

@@ -26,33 +26,91 @@ async function post(url: string, body: unknown, token: string) {
   return json?.data ?? json;
 }
 
+function mapReserva(r: any) {
+  if (!r) return null;
+  return {
+    id:          r.id,
+    vehiculoId:  r.vehiculoId,
+    usuarioId:   r.usuarioId,
+    fechaInicio: r.fechaInicio,
+    fechaFin:    r.fechaFin,
+    estado:      r.status ?? r.estado,
+    total:       r.totalAmount != null ? Number(r.totalAmount) : (r.total != null ? Number(r.total) : null),
+    createdAt:   r.createdAt,
+  };
+}
+
+function mapPago(p: any) {
+  if (!p) return null;
+  return {
+    id:          p.id,
+    reservaId:   p.reservaId,
+    monto:       p.monto != null ? Number(p.monto) : null,
+    metodoPago:  p.metodoPago,
+    estado:      p.status ?? p.estado,
+    createdAt:   p.createdAt,
+  };
+}
+
+function mapVehiculo(v: any) {
+  if (!v) return null;
+  return {
+    id:          v.id,
+    placa:       v.placa,
+    color:       v.color,
+    anio:        v.anio,
+    agenciaId:   v.agenciaId,
+    marca:       v.modelo?.marca?.nombre ?? null,
+    modelo:      v.modelo?.nombre ?? null,
+    categoria:   v.categoria?.nombre ?? null,
+    precioPorDia: v.precioDia != null ? Number(v.precioDia) : null,
+    disponible:  v.status === 'DISPONIBLE',
+    imageUrl:    v.imagenUrl ?? null,
+  };
+}
+
 export const resolvers = {
   Query: {
     vehiculos: async (_: any, args: { disponible?: boolean; categoriaId?: string }) => {
       const params = new URLSearchParams();
-      if (args.disponible !== undefined) params.set('disponible', String(args.disponible));
       if (args.categoriaId) params.set('categoriaId', args.categoriaId);
       const query = params.toString() ? `?${params}` : '';
-      return get(`${INV()}${BASE}/vehiculos/marketplace${query}`);
+      const data = await get(`${INV()}${BASE}/vehiculos/marketplace${query}`);
+      const list = Array.isArray(data) ? data : data?.data ?? [];
+      const mapped = list.map(mapVehiculo);
+      return args.disponible !== undefined
+        ? mapped.filter((v: any) => v.disponible === args.disponible)
+        : mapped;
     },
 
-    vehiculo: async (_: any, args: { id: string }) =>
-      get(`${INV()}${BASE}/vehiculos/${args.id}`),
+    vehiculo: async (_: any, args: { id: string }) => {
+      const data = await get(`${INV()}${BASE}/vehiculos/${args.id}`);
+      return mapVehiculo(data);
+    },
 
-    reservas: async (_: any, __: any, ctx: any) =>
-      get(`${OPS()}${BASE}/reservas`, ctx.token),
+    reservas: async (_: any, __: any, ctx: any) => {
+      const data = await get(`${OPS()}${BASE}/reservas`, ctx.token);
+      const list = Array.isArray(data) ? data : data?.data ?? [];
+      return list.map(mapReserva);
+    },
 
     reserva: async (_: any, args: { id: string }, ctx: any) =>
-      get(`${OPS()}${BASE}/reservas/${args.id}`, ctx.token),
+      mapReserva(await get(`${OPS()}${BASE}/reservas/${args.id}`, ctx.token)),
 
-    misReservas: async (_: any, args: { usuarioId: string }, ctx: any) =>
-      get(`${OPS()}${BASE}/reservas?usuarioId=${args.usuarioId}`, ctx.token),
+    misReservas: async (_: any, args: { usuarioId: string }, ctx: any) => {
+      const data = await get(`${OPS()}${BASE}/reservas?usuarioId=${args.usuarioId}`, ctx.token);
+      const list = Array.isArray(data) ? data : data?.data ?? [];
+      return list.map(mapReserva);
+    },
 
-    pagos: async (_: any, __: any, ctx: any) =>
-      get(`${FIN()}${BASE}/pagos`, ctx.token),
+    pagos: async (_: any, __: any, ctx: any) => {
+      const data = await get(`${FIN()}${BASE}/pagos`, ctx.token);
+      const list = Array.isArray(data) ? data : data?.data ?? [];
+      return list.map(mapPago);
+    },
 
     pago: async (_: any, args: { id: string }, ctx: any) =>
-      get(`${FIN()}${BASE}/pagos/${args.id}`, ctx.token),
+      mapPago(await get(`${FIN()}${BASE}/pagos/${args.id}`, ctx.token)),
 
     facturas: async (_: any, __: any, ctx: any) =>
       get(`${FIN()}${BASE}/facturas`, ctx.token),
@@ -86,12 +144,12 @@ export const resolvers = {
 
   Mutation: {
     crearReserva: async (_: any, args: { input: any; token: string }) =>
-      post(`${OPS()}${V2}/reservas`, args.input, args.token),
+      mapReserva(await post(`${OPS()}${V2}/reservas`, args.input, args.token)),
 
     cancelarReserva: async (_: any, args: { id: string; token: string }) =>
-      post(`${OPS()}${V2}/reservas/${args.id}/cancelar`, {}, args.token),
+      mapReserva(await post(`${OPS()}${V2}/reservas/${args.id}/cancelar`, {}, args.token)),
 
     crearPago: async (_: any, args: { input: any; token: string }) =>
-      post(`${FIN()}${BASE}/pagos`, args.input, args.token),
+      mapPago(await post(`${FIN()}${BASE}/pagos`, args.input, args.token)),
   },
 };

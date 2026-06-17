@@ -5,6 +5,11 @@ export const DLQ      = 'urbancar.dlq';
 
 let channel: amqp.Channel | null = null;
 let connected = false;
+const connectHooks: Array<() => void> = [];
+
+export function onRabbitMQConnect(fn: () => void): void {
+  connectHooks.push(fn);
+}
 
 export async function connectRabbitMQ(serviceName = 'bus-service'): Promise<void> {
   const url = process.env.RABBITMQ_URL ?? 'amqp://localhost';
@@ -18,6 +23,7 @@ export async function connectRabbitMQ(serviceName = 'bus-service'): Promise<void
     channel   = ch;
     connected = true;
     console.log(`[${serviceName}] RabbitMQ conectado → exchange: ${EXCHANGE}`);
+    connectHooks.forEach((fn) => fn());
 
     conn.on('error', (err) => {
       console.error(`[${serviceName}] RabbitMQ error:`, err.message);

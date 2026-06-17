@@ -1,4 +1,4 @@
-export const API_HOST   = 'https://nginx-frontend.ambitioushill-8cbf622c.eastus2.azurecontainerapps.io';
+export const API_HOST   = 'http://urbancar-ec.eastus2.cloudapp.azure.com';
 export const BASE_URL   = `${API_HOST}/api/v1/emilypamela`;
 export const BASE_URL_V2 = `${API_HOST}/api/v2/emilypamela`;
 

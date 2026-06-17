@@ -18,6 +18,7 @@ import * as Haptics from 'expo-haptics';
 import { getCategorias, getMarketplace, Vehiculo } from '../api/api';
 import { COLORS } from '../config';
 import { MarketplaceStackParams } from '../navigation/AppNavigator';
+import { useSocket } from '../hooks/useSocket';
 
 type Nav = StackNavigationProp<MarketplaceStackParams, 'Marketplace'>;
 
@@ -127,11 +128,10 @@ export default function MarketplaceScreen() {
 
   useEffect(() => { loadData(); }, [loadData]);
 
-  // Background polling: silently refresh vehicle list every 60 s
-  useEffect(() => {
-    const id = setInterval(loadData, 60_000);
-    return () => clearInterval(id);
-  }, [loadData]);
+  useSocket(
+    ['reserva:creada', 'reserva:confirmada', 'reserva:cancelada', 'reserva:completada'],
+    () => { setTimeout(loadData, 800); },
+  );
 
   useEffect(() => {
     if (!search.trim()) { setFiltered(vehiculos); return; }

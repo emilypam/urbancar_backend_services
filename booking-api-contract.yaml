@@ -1,0 +1,550 @@
+openapi: 3.0.3
+
+info:
+  title: UrbanCar EC — Booking Integration API
+  version: 2.0.0
+  description: |
+    API pública para sistemas externos que integran reservas, alquileres y
+    devoluciones con la plataforma UrbanCar EC.
+
+    No se requiere token de autenticación en ningún endpoint.
+
+servers:
+  - url: http://urbancar-ec.eastus2.cloudapp.azure.com
+    description: Producción
+
+tags:
+  - name: Vehículos
+    description: Consulta del catálogo de vehículos disponibles
+  - name: Reservas
+    description: Gestión de reservas
+  - name: Alquileres
+    description: Inicio de alquiler
+  - name: Devoluciones
+    description: Registro de devolución
+
+paths:
+
+  # ── Vehículos ────────────────────────────────────────────────────────────────
+
+  /api/v1/emilypamela/vehiculos/booking:
+    get:
+      tags: [Vehículos]
+      summary: Listar vehículos disponibles
+      parameters:
+        - name: agenciaId
+          in: query
+          schema: { type: string, format: uuid }
+        - name: categoriaId
+          in: query
+          schema: { type: string, format: uuid }
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [DISPONIBLE, EN_USO, MANTENIMIENTO]
+            default: DISPONIBLE
+        - name: page
+          in: query
+          schema: { type: integer, default: 1 }
+        - name: limit
+          in: query
+          schema: { type: integer, default: 20 }
+      responses:
+        '200':
+          description: Lista paginada de vehículos
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VehiculoListResponse'
+              example:
+                success: true
+                data:
+                  data:
+                    - id: "5cefcd97-4d82-4f68-bd8d-333234baa074"
+                      nombre: "Chevrolet Captiva 2023"
+                      descripcion: "Amplia SUV familiar."
+                      precioPorDia: 49.00
+                      moneda: "USD"
+                      categoria: "SUV / Familiar"
+                      agenciaId: "7debcfae-2b33-440c-b082-aac2ab0eb460"
+                      disponible: true
+                      status: "DISPONIBLE"
+                      imagenUrl: "https://example.com/captiva.jpg"
+                  total: 6
+                  page: 1
+                  limit: 20
+                  totalPages: 1
+
+  /api/v1/emilypamela/vehiculos/booking/{id}:
+    get:
+      tags: [Vehículos]
+      summary: Obtener vehículo por ID
+      parameters:
+        - $ref: '#/components/parameters/id'
+      responses:
+        '200':
+          description: Datos del vehículo
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VehiculoResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/v1/emilypamela/vehiculos/booking/{id}/disponibilidad:
+    get:
+      tags: [Vehículos]
+      summary: Verificar disponibilidad de un vehículo
+      parameters:
+        - $ref: '#/components/parameters/id'
+      responses:
+        '200':
+          description: Estado de disponibilidad
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DisponibilidadResponse'
+              example:
+                success: true
+                data:
+                  vehiculoId: "5cefcd97-4d82-4f68-bd8d-333234baa074"
+                  disponible: true
+                  status: "DISPONIBLE"
+                  mensaje: "El vehículo está disponible para alquiler"
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ── Reservas ─────────────────────────────────────────────────────────────────
+
+  /api/v2/emilypamela/reservas/booking:
+    post:
+      tags: [Reservas]
+      summary: Crear reserva
+      description: |
+        Crea una reserva en estado `PENDIENTE`. El precio total se calcula
+        automáticamente (`precioPorDia × días`). El vehículo debe estar `DISPONIBLE`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CrearReservaInput'
+            example:
+              vehiculoId: "5cefcd97-4d82-4f68-bd8d-333234baa074"
+              clienteId: "a1b2c3d4-0000-0000-0000-000000000001"
+              fechaInicio: "2026-07-01"
+              fechaFin: "2026-07-05"
+      responses:
+        '201':
+          description: Reserva creada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReservaResponse'
+              example:
+                success: true
+                data:
+                  id: "uuid"
+                  codigoReserva: "RES-M5XYZ1-ABC"
+                  vehiculoId: "5cefcd97-4d82-4f68-bd8d-333234baa074"
+                  clienteId: "a1b2c3d4-0000-0000-0000-000000000001"
+                  agenciaId: "7debcfae-2b33-440c-b082-aac2ab0eb460"
+                  fechaInicio: "2026-07-01"
+                  fechaFin: "2026-07-05"
+                  diasTotal: 4
+                  totalAmount: 196.00
+                  status: "PENDIENTE"
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+
+  /api/v2/emilypamela/reservas/booking/{id}:
+    get:
+      tags: [Reservas]
+      summary: Obtener reserva por ID
+      parameters:
+        - $ref: '#/components/parameters/id'
+      responses:
+        '200':
+          description: Datos de la reserva
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReservaResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    patch:
+      tags: [Reservas]
+      summary: Actualizar estado de reserva
+      description: |
+        Máquina de estados permitida:
+
+        ```
+        PENDIENTE  → CONFIRMADA | CANCELADA
+        CONFIRMADA → ACTIVA     | CANCELADA
+        ACTIVA     → COMPLETADA | CANCELADA
+        ```
+
+        Al confirmar (`CONFIRMADA`) el vehículo pasa a `RESERVADO` en inventario.
+        Al cancelar (`CANCELADA`) el vehículo vuelve a `DISPONIBLE`.
+      parameters:
+        - $ref: '#/components/parameters/id'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ActualizarEstadoInput'
+            example:
+              status: "CONFIRMADA"
+      responses:
+        '200':
+          description: Reserva actualizada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReservaResponse'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+
+  # ── Alquileres ───────────────────────────────────────────────────────────────
+
+  /api/v2/emilypamela/alquileres/booking:
+    post:
+      tags: [Alquileres]
+      summary: Iniciar alquiler
+      description: |
+        Requiere que la reserva esté en estado `CONFIRMADA`.
+        La reserva pasa a `ACTIVA` y el vehículo a `EN_USO`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CrearAlquilerInput'
+            example:
+              reservaId: "uuid-de-la-reserva"
+              kmSalida: 15230
+              fechaInicio: "2026-07-01T10:00:00Z"
+              observaciones: "Sin novedades al momento de salida"
+      responses:
+        '201':
+          description: Alquiler iniciado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AlquilerResponse'
+              example:
+                success: true
+                data:
+                  id: "uuid"
+                  reservaId: "uuid-de-la-reserva"
+                  kmSalida: 15230
+                  fechaInicio: "2026-07-01T10:00:00Z"
+                  status: "ACTIVO"
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+
+  # ── Devoluciones ─────────────────────────────────────────────────────────────
+
+  /api/v2/emilypamela/devoluciones/booking:
+    post:
+      tags: [Devoluciones]
+      summary: Registrar devolución
+      description: |
+        Cierra el alquiler, marca la reserva como `COMPLETADA` y libera el
+        vehículo a estado `DISPONIBLE`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CrearDevolucionInput'
+            example:
+              alquilerId: "uuid-del-alquiler"
+              kmEntrada: 15890
+              estadoVehiculo: "BUENO"
+              cargoExtra: 25.00
+              observaciones: "Rayón leve en puerta trasera derecha"
+      responses:
+        '201':
+          description: Devolución registrada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DevolucionResponse'
+              example:
+                success: true
+                data:
+                  id: "uuid"
+                  alquilerId: "uuid-del-alquiler"
+                  kmEntrada: 15890
+                  estadoVehiculo: "BUENO"
+                  cargoExtra: 25.00
+                  observaciones: "Rayón leve en puerta trasera derecha"
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+
+# ─────────────────────────────────────────────────────────────────────────────
+# COMPONENTES
+# ─────────────────────────────────────────────────────────────────────────────
+
+components:
+
+  parameters:
+    id:
+      name: id
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+
+  schemas:
+
+    CrearReservaInput:
+      type: object
+      required: [vehiculoId, clienteId, fechaInicio, fechaFin]
+      properties:
+        vehiculoId:
+          type: string
+          format: uuid
+        clienteId:
+          type: string
+          format: uuid
+        agenciaId:
+          type: string
+          format: uuid
+          description: Opcional — se toma del vehículo si no se envía
+        fechaInicio:
+          type: string
+          description: "Formato: YYYY-MM-DD o YYYY-MM-DDTHH:mm:ssZ"
+          example: "2026-07-01"
+        fechaFin:
+          type: string
+          description: Debe ser posterior a fechaInicio
+          example: "2026-07-05"
+
+    ActualizarEstadoInput:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [PENDIENTE, CONFIRMADA, ACTIVA, COMPLETADA, CANCELADA]
+
+    CrearAlquilerInput:
+      type: object
+      required: [reservaId]
+      properties:
+        reservaId:
+          type: string
+          format: uuid
+        kmSalida:
+          type: number
+          example: 15230
+        fechaInicio:
+          type: string
+          format: date-time
+          description: Opcional — se usa la fecha actual si no se envía
+        observaciones:
+          type: string
+
+    CrearDevolucionInput:
+      type: object
+      required: [alquilerId]
+      properties:
+        alquilerId:
+          type: string
+          format: uuid
+        kmEntrada:
+          type: number
+          example: 15890
+        estadoVehiculo:
+          type: string
+          example: "BUENO"
+        cargoExtra:
+          type: number
+          default: 0
+          example: 25.00
+        observaciones:
+          type: string
+
+    Vehiculo:
+      type: object
+      properties:
+        id:           { type: string, format: uuid }
+        nombre:       { type: string }
+        descripcion:  { type: string }
+        precioPorDia: { type: number }
+        moneda:       { type: string, example: "USD" }
+        categoria:    { type: string }
+        agenciaId:    { type: string, format: uuid }
+        disponible:   { type: boolean }
+        status:
+          type: string
+          enum: [DISPONIBLE, EN_USO, MANTENIMIENTO, FUERA_DE_SERVICIO]
+        imagenUrl:    { type: string, format: uri, nullable: true }
+
+    VehiculoListResponse:
+      type: object
+      properties:
+        success: { type: boolean }
+        data:
+          type: object
+          properties:
+            data:       { type: array, items: { $ref: '#/components/schemas/Vehiculo' } }
+            total:      { type: integer }
+            page:       { type: integer }
+            limit:      { type: integer }
+            totalPages: { type: integer }
+
+    VehiculoResponse:
+      type: object
+      properties:
+        success: { type: boolean }
+        data:    { $ref: '#/components/schemas/Vehiculo' }
+
+    DisponibilidadResponse:
+      type: object
+      properties:
+        success: { type: boolean }
+        data:
+          type: object
+          properties:
+            vehiculoId:  { type: string, format: uuid }
+            disponible:  { type: boolean }
+            status:      { type: string }
+            mensaje:     { type: string }
+
+    Reserva:
+      type: object
+      properties:
+        id:            { type: string, format: uuid }
+        codigoReserva: { type: string }
+        vehiculoId:    { type: string, format: uuid }
+        clienteId:     { type: string, format: uuid }
+        agenciaId:     { type: string, format: uuid }
+        fechaInicio:   { type: string }
+        fechaFin:      { type: string }
+        diasTotal:     { type: integer }
+        totalAmount:   { type: number }
+        status:
+          type: string
+          enum: [PENDIENTE, CONFIRMADA, ACTIVA, COMPLETADA, CANCELADA]
+
+    ReservaResponse:
+      type: object
+      properties:
+        success: { type: boolean }
+        data:    { $ref: '#/components/schemas/Reserva' }
+
+    Alquiler:
+      type: object
+      properties:
+        id:            { type: string, format: uuid }
+        reservaId:     { type: string, format: uuid }
+        kmSalida:      { type: number }
+        fechaInicio:   { type: string, format: date-time }
+        observaciones: { type: string, nullable: true }
+        status:        { type: string, enum: [ACTIVO, FINALIZADO] }
+
+    AlquilerResponse:
+      type: object
+      properties:
+        success: { type: boolean }
+        data:    { $ref: '#/components/schemas/Alquiler' }
+
+    Devolucion:
+      type: object
+      properties:
+        id:             { type: string, format: uuid }
+        alquilerId:     { type: string, format: uuid }
+        kmEntrada:      { type: number }
+        estadoVehiculo: { type: string, nullable: true }
+        cargoExtra:     { type: number }
+        observaciones:  { type: string, nullable: true }
+
+    DevolucionResponse:
+      type: object
+      properties:
+        success: { type: boolean }
+        data:    { $ref: '#/components/schemas/Devolucion' }
+
+    ErrorResponse:
+      type: object
+      properties:
+        success: { type: boolean, example: false }
+        error:
+          type: object
+          properties:
+            code:    { type: string }
+            message: { type: string }
+
+  responses:
+    NotFound:
+      description: Recurso no encontrado
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+          example:
+            success: false
+            error: { code: "NOT_FOUND", message: "Recurso no encontrado" }
+
+    ValidationError:
+      description: Campos requeridos faltantes o con formato incorrecto
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+          example:
+            success: false
+            error: { code: "VALIDATION_ERROR", message: "vehiculoId, clienteId, fechaInicio y fechaFin son requeridos" }
+
+    Conflict:
+      description: El recurso ya existe o el vehículo ya tiene una reserva activa
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+          example:
+            success: false
+            error: { code: "CONFLICT", message: "El vehículo ya tiene una reserva activa" }
+
+    UnprocessableEntity:
+      description: Estado de negocio inválido
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+          examples:
+            vehiculo_no_disponible:
+              value:
+                success: false
+                error: { code: "VEHICLE_NOT_AVAILABLE", message: "El vehículo no está disponible" }
+            transicion_invalida:
+              value:
+                success: false
+                error: { code: "INVALID_TRANSITION", message: "No se puede cambiar de COMPLETADA a PENDIENTE" }
+            reserva_no_confirmada:
+              value:
+                success: false
+                error: { code: "INVALID_STATUS", message: "Solo se puede iniciar un alquiler de una reserva CONFIRMADA" }

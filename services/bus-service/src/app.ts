@@ -3,7 +3,8 @@ import express from 'express';
 import cors from 'cors';
 import { createOrchestratorRouter } from './modules/orchestrator/orchestrator.routes.js';
 import { isSenderConnected } from './shared/bus/service-bus.js';
-import { connectRabbitMQ } from './shared/bus/rabbitmq.js';
+import { connectRabbitMQ, onRabbitMQConnect } from './shared/bus/rabbitmq.js';
+import { startConsumer } from './shared/bus/rabbitmq-consumer.js';
 
 const app = express();
 
@@ -11,6 +12,7 @@ app.set('trust proxy', 1);
 app.use(cors({ origin: process.env.CORS_ORIGIN ?? '*' }));
 app.use(express.json());
 
+onRabbitMQConnect(() => startConsumer());
 connectRabbitMQ('bus-service');
 
 app.get('/health', (_req, res) => {

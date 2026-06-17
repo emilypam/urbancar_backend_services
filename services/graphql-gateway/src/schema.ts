@@ -4,7 +4,7 @@ export const typeDefs = `#graphql
     id: ID!
     marca: String
     modelo: String
-    año: Int
+    anio: Int
     placa: String
     color: String
     categoria: String

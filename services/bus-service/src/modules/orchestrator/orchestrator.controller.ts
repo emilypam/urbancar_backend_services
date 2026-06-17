@@ -1,3 +1,4 @@
+import { randomUUID } from 'crypto';
 import { Request, Response, NextFunction } from 'express';
 import { publishEvent, getEventLog } from '../../shared/bus/service-bus.js';
 import { httpPost } from '../../shared/http/client.js';
@@ -10,18 +11,21 @@ function token(req: Request): string {
   return req.headers.authorization!.slice(7);
 }
 
+function correlationId(req: Request): string {
+  return (req.headers['x-correlation-id'] as string | undefined) ?? randomUUID();
+}
+
 export async function crearReserva(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const result = await httpPost<any>(
       `${OPS_URL()}/api/v1/emilypamela/reservas`,
       req.body,
       token(req),
+      correlationId(req),
     );
 
-    const reservaId = result?.data?.id ?? result?.id ?? 'unknown';
-    const event = await publishEvent('RESERVA_CREADA', req.user!.id, reservaId, req.body as any);
-
-    res.status(201).json({ success: true, data: result?.data ?? result, event });
+    // operaciones-service v2 publica reservas.reserva.creada — no duplicar aquí
+    res.status(201).json({ success: true, data: result?.data ?? result });
   } catch (err: any) {
     if (err.status) {
       res.status(err.status).json({ success: false, error: err.upstream ?? { message: err.message } });
@@ -38,11 +42,11 @@ export async function cancelarReserva(req: Request, res: Response, next: NextFun
       `${OPS_URL()}/api/v1/emilypamela/reservas/${id}/cancelar`,
       req.body ?? {},
       token(req),
+      correlationId(req),
     );
 
-    const event = await publishEvent('RESERVA_CANCELADA', req.user!.id, id, req.body as any ?? {});
-
-    res.json({ success: true, data: result?.data ?? result, event });
+    // operaciones-service v2 publica reservas.reserva.cancelada — no duplicar aquí
+    res.json({ success: true, data: result?.data ?? result });
   } catch (err: any) {
     if (err.status) {
       res.status(err.status).json({ success: false, error: err.upstream ?? { message: err.message } });
@@ -58,6 +62,7 @@ export async function iniciarAlquiler(req: Request, res: Response, next: NextFun
       `${OPS_URL()}/api/v1/emilypamela/alquileres`,
       req.body,
       token(req),
+      correlationId(req),
     );
 
     const alquilerId = result?.data?.id ?? result?.id ?? 'unknown';
@@ -79,6 +84,7 @@ export async function registrarDevolucion(req: Request, res: Response, next: Nex
       `${OPS_URL()}/api/v1/emilypamela/devoluciones`,
       req.body,
       token(req),
+      correlationId(req),
     );
 
     const alquilerId = req.body?.alquilerId ?? result?.data?.alquilerId ?? 'unknown';

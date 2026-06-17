@@ -23,6 +23,12 @@ export const UpdateProfileSchema = z.object({
   ciudadId:  z.string().uuid('El ID de ciudad no es válido').optional(),
 });
 
-export type RegisterDto      = z.infer<typeof RegisterSchema>;
-export type LoginDto         = z.infer<typeof LoginSchema>;
-export type UpdateProfileDto = z.infer<typeof UpdateProfileSchema>;
+export const ChangePasswordSchema = z.object({
+  currentPassword: z.string().min(1, 'La contraseña actual es requerida'),
+  newPassword:     z.string().min(8, 'La nueva contraseña debe tener al menos 8 caracteres').max(100),
+});
+
+export type RegisterDto       = z.infer<typeof RegisterSchema>;
+export type LoginDto          = z.infer<typeof LoginSchema>;
+export type UpdateProfileDto  = z.infer<typeof UpdateProfileSchema>;
+export type ChangePasswordDto = z.infer<typeof ChangePasswordSchema>;

@@ -3,7 +3,7 @@ import rateLimit from 'express-rate-limit';
 import { AuthController } from './auth.controller.js';
 import { authenticate } from '../../shared/middlewares/auth.middleware.js';
 import { validateBody } from '../../shared/middlewares/validate.middleware.js';
-import { RegisterSchema, LoginSchema, UpdateProfileSchema } from './auth.dto.js';
+import { RegisterSchema, LoginSchema, UpdateProfileSchema, ChangePasswordSchema } from './auth.dto.js';
 
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
@@ -18,6 +18,7 @@ export function createAuthRouter(controller: AuthController): Router {
   router.post('/register', authLimiter, validateBody(RegisterSchema), controller.register);
   router.post('/login',    authLimiter, validateBody(LoginSchema),    controller.login);
   router.get('/me',        authenticate,                               controller.me);
-  router.patch('/me',      authenticate, validateBody(UpdateProfileSchema), controller.updateMe);
+  router.patch('/me',          authenticate, validateBody(UpdateProfileSchema),  controller.updateMe);
+  router.patch('/me/password', authenticate, validateBody(ChangePasswordSchema), controller.changePassword);
   return router;
 }

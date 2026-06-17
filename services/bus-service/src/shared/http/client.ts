@@ -1,9 +1,10 @@
-export async function httpPost<T>(url: string, body: unknown, token: string): Promise<T> {
+export async function httpPost<T>(url: string, body: unknown, token: string, correlationId?: string): Promise<T> {
   const res = await fetch(url, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       Authorization: `Bearer ${token}`,
+      ...(correlationId && { 'X-Correlation-ID': correlationId }),
     },
     body: JSON.stringify(body),
   });
@@ -20,9 +21,12 @@ export async function httpPost<T>(url: string, body: unknown, token: string): Pr
   return json;
 }
 
-export async function httpGet<T>(url: string, token: string): Promise<T> {
+export async function httpGet<T>(url: string, token: string, correlationId?: string): Promise<T> {
   const res = await fetch(url, {
-    headers: { Authorization: `Bearer ${token}` },
+    headers: {
+      Authorization: `Bearer ${token}`,
+      ...(correlationId && { 'X-Correlation-ID': correlationId }),
+    },
   });
 
   const json = await res.json() as any;

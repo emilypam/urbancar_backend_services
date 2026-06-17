@@ -2,7 +2,7 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { UsuarioRepository } from '../usuarios/usuario.repository.js';
 import { ValidationException, ConflictException, NotFoundException } from '../../shared/errors/BusinessException.js';
-import type { RegisterDto, LoginDto, UpdateProfileDto } from './auth.dto.js';
+import type { RegisterDto, LoginDto, UpdateProfileDto, ChangePasswordDto } from './auth.dto.js';
 
 export class AuthService {
   constructor(private readonly usuarioRepository: UsuarioRepository) {}
@@ -67,5 +67,15 @@ export class AuthService {
     const user = await this.usuarioRepository.findById(userId);
     if (!user) throw new NotFoundException('Usuario', userId);
     return this.usuarioRepository.update(userId, dto);
+  }
+
+  async changePassword(userId: string, dto: ChangePasswordDto) {
+    const user = await this.usuarioRepository.findById(userId);
+    if (!user) throw new NotFoundException('Usuario', userId);
+    const isValid = await bcrypt.compare(dto.currentPassword, (user as any).passwordHash);
+    if (!isValid) throw new ValidationException('La contraseña actual es incorrecta');
+    const passwordHash = await bcrypt.hash(dto.newPassword, 10);
+    await this.usuarioRepository.update(userId, { passwordHash });
+    return { message: 'Contraseña actualizada correctamente' };
   }
 }
